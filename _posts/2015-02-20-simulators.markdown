@@ -30,20 +30,21 @@ doesn't have a test instance, or they're ridiculously expensive. I've once devel
 system that was "production" during business hours and "test" during all other hours. Don't ever do
 that.
 
-But, despite system availablity - simulators are a good idea if you're offsite or otherwise
-disconnected from that environment and the team that maintains that other system. They offers quite
+But, despite system availability - simulators are a good idea if you're offsite or otherwise
+disconnected from that environment and the team that maintains that other system. Simulation offers quite
 a few benefits:
 
 * It simplifies your application & infrastructure code by having just one code path. This is
   provided that your simulators are interacting with your app in the same way as production;
-* It forces you to consider how the interfacing system(s) work and interact with your system;
+* It forces you to consider how the interfacing system(s) work and interact with your system and
+  therefore the high-level design of all the interacting components; and
 * You end up exploring interface requirements via code rather than documentation, which forces you
   to understand it more thoroughly.
 
 But - simulators do add a code maintenance burden. They may grow into a large codebase that needs to
-be maintained alongside your production code. This is why I think Clojure and core.async may be a
+be maintained alongside your production code. This is why I think clojure and core.async may be a
 good choice. Clojure code tends to be terser than Java (due to a huge reduction in line noise), and
-deals well with concurrency.
+deals very well with concurrency issues.
 
 # Our requirements
 
@@ -84,7 +85,7 @@ Even a programmer who doesn't understand clojure would be able to understand wha
 doing. We continually loop in the go-block to receive, validate the request against seen-ids, and
 call a function (receive-fn) using the request if it is valid.
 
-Let's start defining that receive-fn:
+Let's define something we can use for that receive-fn (we'll see how to tie it in further below):
 
 {% highlight clojure %}
 (defn create-subscription
@@ -149,7 +150,10 @@ channels up to the transport quite easily:
                          #(<!! prices-chan))))
 {% endhighlight %}
 
-And at long last - we have our core simulator which will tie everything together:
+
+# Tying it all together
+
+And at long last - we have our core simulator function which will tie everything together:
 
 {% highlight clojure %}
 (defn start-simulator
@@ -172,14 +176,13 @@ And at long last - we have our core simulator which will tie everything together
 
 # Conclusions
 
-Though I'm yet to use a core.async-backed system in a production setting, from this little
-experiment I can conclude a few things:
+Though I'm yet to use a core.async-backed system (simulator or otherwise) in a production setting,
+from this little exploration I can conclude a few things:
 
 * The CSP programming model allows you to break your problem up quite naturally
-* Tersity and simplicity of functions should mean easier maintenance
+* Terseness and simplicity of functions should mean easier maintenance
 * The amount of 'noise' vs Java's concurrency primitives (and Java in general) is incredibly low
 * I've only touched the tip of what core.async is capable of doing. The library offers up a tonne of
-  methods and primitive functions that you can use for your conquests.
+  methods and primitive functions.
 
-
-
+So, in short, I think I'll be playing around with core.async a lot more!
