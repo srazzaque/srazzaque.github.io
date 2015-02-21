@@ -55,7 +55,7 @@ We have a single pricing engine. Upon subscription, the engine will pump out pri
 subscription for 30 seconds, then stop. If subscribers attempt to re-use a subscription ID, then a
 message is logged and nothing will be published for that subscription.
 
-## Simulator core
+# Simulator core
 
 Our pricing simulator can be thought of as two main procedures:
 
