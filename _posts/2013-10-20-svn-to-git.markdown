@@ -1,0 +1,60 @@
+---
+layout: post
+title:  "From SVN to Git"
+date:   2013-10-20 00:00:01
+categories: git
+tags: git svn enterprise
+---
+
+Over the past few months I have been actively involved in the transition from SVN to Git in a major financial institution here in NYC. Let's just say it the ride hasn't been without its bumps. Here are a few of the main obstacles we encountered - and lessons learnt for any of you taking on the same journey.
+
+# Expect user education issues and resistance
+
+Lets face it - Git is _considerably_ more complex than SVN, and as a result, _much_ less user friendly. I'd consider myself fairly comfortable with Git, but I'm still learning new things about it quite regularly. The fact that you can do one thing in 20 different ways doesn't make it easy to teach newcomers either
+
+For people that have used SVN for years, Git will almost certainly come across as overly complicated. Somewhat akin to using a jack-hammer for a nail in the wall. Some complaints you're very likely to encounter are:
+
+* Why do I have to commit, then push? That's way too many steps just to commit some code.
+* Oh I see - you did it that way, but Bob said do it this way. What's up with that?
+* Isn't that really inefficient - copying the whole repository around everywhere?
+* Why are the revision identifiers so weird? Why can't they just be simple numbers?
+
+Notice that the majority of the above complaints stem trying to fit the Git workflow into a SVN mental framework. This just does not quite work. So place emphasis on how a DVCS conceptually differs from the centralised model early in the education process. It also helped to have a few users on the team who were already savvy with Git on the team.
+
+# Don't do a two-way sync
+
+We have a fairly large number of committers to our main codebase. This meant that, in the hope of not killing productivity, a hack-job of a two-way sync was set up between Git and SVN so that SVN users would be unaffected, and we could slowly transition people over to Git.
+
+Now this hack-job had a peculiar set of issues that forced us to work with Git in a certain way. I'll spare the details from this post - but it meant that people trying out Git had to issue a few more commands to get the same amount of work done - so the workflow was worse than both pure-Git and pure-SVN.
+
+Unfortunately, this meant that a lot of newcomers were put off Git in general, as they mistook the crappiness encountered due to the two-way sync as general Git-crappiness.
+
+If I could go back, I'd have preferred a direct cutover - effectively 'ripping the band-aid off'. Sure, it might sting a bit in the beginning - but necessity is the mother of all learning and progress :-) That said - it wouldn't quite have been that easy...
+
+# Decouple surrounding "stuff" from VCS
+
+A lot of our CI and deployment jobs had intimate knowledge and tie-in with the VCS being used. Thus they were entangled in the 'dependency-graph' associated with cutting over. For us, these jobs were crucial to the application we were developing. We rely on these jobs to deploy to environments for other teams to perform their testing.
+
+In fact, we developers don't even run the jobs - the teams responsible for each environment do. Naturally, they expect things to "just work". Problem was, quite often they don't (and this is pre-Git). This complicated matters.
+
+To compound things even further, we have a release notes tool which reverse-walks commits and picks out Jira-tickets from the comments. This also had to be updated - which was further developer effort.
+
+You'll want to identify these things way up ahead of time, and hit them off as early as possible.
+
+# Identify a branching strategy early on
+
+There are&nbsp;<a href="https://confluence.atlassian.com/display/STASH023/Workflow+strategies+in+Stash" target="_blank">several Git branching strategies</a> to choose from. Study these and plan for how each would work with your release landscape.
+
+For us, we were initially thinking GitFlow. But, we realised that it just would not have worked - we have several simultaneously running releases across different regions, any of which may require a hot-fix turned around. A hot-fix turnaround in a specific region should not necessitate pulling in changes that have happened to 'master' since the release.
+
+Whatever the strategy, it must have buy-in from all code contributors and relevant stakeholders, and be agreed upon as early as possible. Which leads us to the final point...
+
+# Finally - a little less conversation
+
+Don't fall into the trap of paralysis by analysis. Recognise that sometimes a decision, even a mediocre one, is better than weeks of conversation _about_ a decision. Obviously don't destroy things, take the necessary steps to avoid catastrophes - but recognise that decisions are just starting points.
+
+We were definitely guilty of talking for a little too long about the branching strategy - in the end, we went with a simple forking strategy, where contributors submit pull requests to the main repository's master branch from their individual forks. However - now we're thinking of evolving the strategy to also have an integration branch that would aid us due to a shared dev environment.
+
+Point is - a lot of decisions, as scary and irreversible as they seem at first, are really just starting points. It's important to recognise this. We're lucky that in software it is very unlike other industries such as civil engineering or architecture, where it's a little harder and more expensive to pivot.
+
+Anyway - I hope this braindump was useful to someone out there. If so, I wish you the best of luck!
