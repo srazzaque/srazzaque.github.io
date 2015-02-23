@@ -2,7 +2,7 @@
 title: "#!/bin/sandipan"
 email: me@sandipan.net
 description: > # this means to ignore newlines until "baseurl:"
-  Posts about programming.
+  Programming & productivity.
 baseurl: "" # the subpath of your site, e.g. /blog/
 url: "http://blog.sandipan.net" # the base hostname & protocol for your site
 twitter_username: srazzaque
