@@ -1,0 +1,284 @@
+---
+layout: post
+title:  "OO to FP: 1 - Problem Decomposition"
+date:   2015-09-01 11:42:00
+categories: clojure
+tags: clojure java "functional programming" FP
+---
+
+This is the first in a series of posts in which I'll be examining common patterns found in OO, the
+problems they are trying to solve, and then how these same problems might be approached in FP.
+
+I'll be using Clojure as my functional language, and Java as my OO language.
+
+Let's take a look at the high-level act of *Problem Decomposition*. That is - given a problem
+domain, what steps might one take to represent the problem domain in the functional code.
+
+Consider a simple example in the domain of Train timetables. We want a simple service that exists to
+answer one question: *what time is my next train?*.
+
+## Imperative / OO approach
+
+In an OO/Java world, we will likely have done some sort of decomposition as follows:
+
+1. Identify the **objects** that are in play in the problem domain. Some candidate objects: Train,
+   Trip, Stop, TrainSchedule
+
+2. Given the above, how do I address my problem domain (i.e. answer the question of when the next
+   train is?) What are the **steps** involved?. What **behaviours** and **relationships** enable
+   this?
+
+This is obviously highly simplified - but it will suffice for illustrative purposes. Going down this
+path - we may end up with something like this:
+
+{% highlight java %}
+public class ScheduleQueryService {
+
+  @Inject
+  private TrainSchedule trainSchedule;
+
+  @Nullable
+  LocalDateTime nextTrain(Stop origin, Stop destination) {
+    List<Trip> originTrips = trainSchedule.findTripsWithStop(origin);
+    List<Trip> candidateTrips = Lists.newArrayList();
+    LocalDateTime now = new LocalDateTime();
+    for (Trip trip : originTrips) {
+      if (trip.stopsAt(destination)
+            && trip.timeAt(origin).isAfter(now)
+            && trip.timeAt(destination).isAfter(trip.timeAt(origin))) {
+        candidateTrips.add(trip);
+      }
+    }
+    if (candidateTrips.isEmpty()) {
+      return null;
+    }
+    Collections.sort(candidateTrips, compareByDepartureTime);
+    return candidateTrips.get(0).getTimeAt(origin);
+  }
+
+}
+{% endhighlight %}
+
+There's definitely room to clean the above up, but it's fairly straightforward, readable and natural
+to most OO programmers. This post assumes the reader is more familiar with OO than FP, so we won't
+offer a lot more detail as to how one may have come to the above, nor include the boilerplate to
+define all of those classes.
+
+## FP approach
+
+In an FP/Clojure world, we're more likely to decompose the problem by:
+
+1. Identifying the **data representation** for what we're interested in. This is similar to
+   identifying the objects we're interested in, but we focus more on a representation mechanism that
+   makes sense for the problem domain rather than on identifying objects that model domain concepts.
+
+2. Focusing on the necessary **transformations and definitions** to address the problem domain. We
+    zero-in on defining particular aspects of the problem. For instance, what does *"my next train"*
+    really mean in terms of the data representation?
+
+Let's take a stab at the above, step by step.
+
+### Data representation
+
+The data representation needs to be able to represent trips and the time that they
+arrive at each of the stops [1]. We could start with a structure as follows:
+
+{% highlight clojure %}
+(def trips
+  ;; Each trip is a uni-directional trip.
+   [{:id 0,
+     :stops [{:stop "Wynyard"
+              :time "2015-07-15T18:47"}
+             {:stop "Town Hall"
+              :time "2015-07-15T18:49"}
+             {:stop "Central"
+              :time "2015-07-15T18:53"}
+             {:stop "Redfern"
+              :time "2015-07-15T18:55"}]}
+    {:id 1, 
+     :stops [{:stop "Wynyard"
+              :time "2015-07-15T18:48"}
+             {:stop "Town Hall"
+              :time "2015-07-15T18:50"}
+             {:stop "Redfern"
+              :time "2015-07-15T18:54"}
+             {:stop "Redfern"
+              :time "2015-07-15T18:56"}]}])
+{% endhighlight %}
+
+Of course, we could tighten/enforce the above schema using something like the awesome
+[prismatic schema](https://github.com/Prismatic/schema) library, but let's stick to vanilla clojure
+for now.
+
+### Definitions and transformations
+
+Once our data is organised in a manner that suits us, defining the necessary transformations becomes
+firstly a case of asking and answering a few questions in light of the data structure we have, and
+secondly defining functions to represent and answer these questions.
+
+Let's start with the obvious question of: what does "*my next train*" mean?
+
+1. It stops at my origin before my destination
+2. It stops at my origin after 'now'
+3. It is the very next train stopping at my origin
+
+#### Slight digression - some key FP functions
+
+There are a handful of key functions that one should know through and through in FP. Knowing them
+will make reading and writing idiomatic functional code much more natural, regardless of the
+implementation language [2].
+
+These key transformative functions are **reduce**, **map**, and **filter**. There are many others,
+such as **flatMap** (or **mapcat** in Clojure), but these 3 are a good start. These functions are
+part of a class of functions known as
+[higher order functions](https://en.wikipedia.org/wiki/Higher-order_function) - meaning they either
+take a function as input, or return a function. All of the 3 transformations mentioned take a
+function and a collection as inputs, and return a *new* collection representing the result (the
+original collection remains unmodified).
+
+The filter function takes a **predicate function** and a collection. A predicate function is a
+function that takes one argument and returns a true/false value.
+
+{% highlight clojure %}
+(def numbers [1 2 3 4])
+
+(filter odd? numbers)
+;; (1 3)
+{% endhighlight %}
+
+And a reduce function is one that takes a **reducing function** and a collection. A reducing
+function in its simplest form takes 2 inputs, and provides a single output of the same type - but it
+may provide an output of a different type (though we won't cover that here):
+
+{% highlight clojure %}
+(def numbers [1 2 3 4])
+
+(reduce + numbers)
+;; 10
+
+(defn greater
+  [a b]
+  (if (> a b) a b))
+
+(reduce greater numbers)
+;; 4
+
+{% endhighlight %}
+
+When broken down to their core, many domain questions are simply a case of identifying transformations
+on data structures. So we'll keep this in mind when implementing the code that answers *when is my
+next train?*.
+
+#### Defining our functions
+
+Just pulling from our definition above - we have:
+
+1. It stops at my origin before my destination: **filter**
+2. It stops at my origin after 'now': **filter**
+3. It is the very next train stopping at my origin: **reduction** or **sort** (you're probably
+   familiar with the latter)
+
+Let's start by defining some helper functions (full source available
+[here](https://gist.github.com/srazzaque/7be0482c606506a8b860)) that will compose together to hit
+off (1) and (2):
+
+{% highlight clojure %}
+(defn goes-to?
+  "Returns 'true' if the given trip stops at the origin THEN the destination."
+  [origin destination trip]
+  ...)
+
+(defn is-after?
+  "Returns 'true' if the given trip gets to the origin after the given time."
+  [origin time trip]
+  ...)
+{% endhighlight %}
+
+Note that both of the above functions are small and *pure* (meaning their result is entirely
+determined by their input) - which has its advantages. This makes them very easy to
+test. Furthermore, if our convention is to write much of our "business logic" code in this "small
+and pure" manner, then reasoning about the important parts of the system becomes much easier, and we
+don't get complexities arising from state mutation.
+
+Now, we can build our initial function to address points (1) and (2):
+
+{% highlight clojure %}
+(defn get-all-trips
+  [trips time-now origin destination]
+  (let [result1 (filter #(goes-to? origin destination %) trips)
+        result2 (filter #(is-after? origin time-now %) result1)]
+    result2))
+{% endhighlight %}
+
+... But we can do better than that:
+
+{% highlight clojure %}
+(defn get-all-trips
+  "Returns all trips after 'time-now' that can take someone
+   from 'origin' to 'destination'"
+  [trips time-now origin destination]
+  (->> trips
+       (filter (partial goes-to? origin destination))
+       (filter (partial is-after? origin time-now))))
+{% endhighlight %}
+
+In the above we've made use of the
+[thread last macro `->>`](https://clojuredocs.org/clojure.core/-%3E%3E) and the
+[`partial`](https://clojuredocs.org/clojure.core/partial) function to
+[curry](https://en.wikipedia.org/wiki/Currying) our earlier function definitions [3].
+
+Another thing about our `get-all-trips` function is that, because filter operations return *lazy
+sequences*, the entire function returns a lazy sequence. That is, the result is not evaluated until
+it is actually needed. But - I digress again, we'll leave aside the topic of laziness for now.
+
+Finally - let's define our function to get our earliest train from the given the output of the
+`get-all-trips` function. We'll do it as a reduction:
+
+{% highlight clojure %}
+(defn earliest
+  "Given a stop and 2 trips, returns the trip which arrives 
+   at that stop earlier"
+  [stop trip1 trip2]
+  ...)
+
+(defn get-earliest
+  [trips time-now origin destination]
+  (let [reduce-fn (partial earliest origin)
+        candidates (get-all-trips trips time-now origin destination)]
+    (if (seq candidates)
+      (reduce reduce-fn
+              candidates))))
+{% endhighlight %}
+
+And there we have it - the above returns the earliest trip along with all of its stops at all of its
+times.
+
+# Conclusions
+
+This was a primer to problem decomposition in FP. It certainly shares a lot of similarities to OOP,
+but our focus is on data and transformations rather than objects, relationships and behaviours. You
+can view the entire code on [this gist](https://gist.github.com/srazzaque/7be0482c606506a8b860).
+
+Key takeaways:
+
+* Know your data
+* Know your bread and butter operations such as filter, reduce and map
+* Focus on writing pure functions
+
+There's, of course, much more to explore. For instance, how do we talk to databases or work with
+a messaging layer? We'll be exploring these in future posts :-)
+
+# End-notes
+
+[1] Of course, a real train scheduling system would need to take into consideration much higher
+degrees of complexity - to avoid collisions, arrival and departure times, etc. But our problem
+domain is merely a query service, so does not (and should not) entail that complexity.
+
+[2] A complaint I have heard about FP and its tersity: "3 pages of readable code is much preferable
+to 3 lines of unreadable code". But, readability is both a function of familiarity and how well
+written the code is. By becoming familiar with key FP concepts, the FP code will become just as
+natural to read over time (providing the author of the code writes well). The concepts mentioned
+here will be encountered over and over in most FP languages.
+
+[3] The concept of "currying" or "partial application" is definitely another FP concept worth
+getting one's head around. It comes up in most languages.
