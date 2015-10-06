@@ -60,9 +60,19 @@ public class ScheduleQueryService {
 {% endhighlight %}
 
 There's definitely room to clean the above up, but it's fairly straightforward, readable and natural
-to most OO programmers. This post assumes the reader is more familiar with OO than FP, so we won't
-offer a lot more detail as to how one may have come to the above, nor include the boilerplate to
-define all of those classes.
+to most OO programmers. A few things that are worth mentioning:
+
+* **Encapsulation**: By organising our data and methods into classes, OO decomposition gives us a
+  natural way to modularise and organise the code. For instance - the `stopsAt()` method very
+  naturally sits in the `Trip` class.
+
+* **Natural readability**: If we aim for a rich domain model (as opposed to an anemic domain model),
+  we can end up with code that can read quite "fluently". For example - `trip.timeAt(origin)` - any
+  guess to what that might return? Readable code is a great thing!
+
+* **Im/mutability**: I'll touch on this more in a future post, but OO and immutability do not have
+  to be mutually exclusive. We have used a locally mutable variable above, namely
+  `candidateTrips`. But all of our domain objects are assumed to be immutable.
 
 ## FP approach
 
@@ -253,20 +263,78 @@ Finally - let's define our function to get our earliest train from the given the
 And there we have it - the above returns the earliest trip along with all of its stops at all of its
 times.
 
+# Organising our code
+
+Earlier we touched on how the OO decomposition offered us some guidance for organising our code. For
+instance, the `stopsAt` is on the `Trip` class, and each class which will generally be in its own
+file.
+
+Unlike the OOP breakdown, the FP breakdown doesn't offer a code organisation strategy that naturally
+falls out from the decomposition. In Clojure, all the functions that we defined above were in the
+same namespace. But this namespacing strategy will obviously not scale well in larger applications.
+
+However, we can definitely take some guidance from the OO world in how to namespace our
+functions. That is - think of the *thing* the function most relates to, and namespace
+accordingly. There are however two more things we should keep in mind:
+
+1. We want the majority of our namespaces to consist only of pure functions. This makes the
+   functions easy to test and reason about.
+
+2. We want to isolate any state into as few a namespaces as possible (I like to aim for 1, if at all
+   possible). This enables us to quickly understand the state of our system by looking in very few
+   places.
+
+Here is a potential set of namespaces for our code:
+
+{% highlight clojure %}
+(ns query-service.core
+  "The entry point for our query service (i.e. main run method)")
+  ;; e.g. our (defn -main [& args] ...)
+
+(ns query-service.query
+  "Core query functions - called from core.")
+  ;; e.g. (defn get-earliest [] ...)
+
+(ns query-service.trip
+  "Trip-related functions")
+  ;; e.g. (defn is-before? [..])
+  ;;      (defn is-after? [..])
+
+(ns query-service.data
+  "The data/state for our query service.")
+  ;; e.g. (def trips {...})
+{% endhighlight %}
+
+With this, it becomes much easier to test and scale the code up.
+
 # Conclusions
 
-This was a primer to problem decomposition in FP. It certainly shares a lot of similarities to OOP,
-but our focus is on data and transformations rather than objects, relationships and behaviours. You
-can view the entire code on [this gist](https://gist.github.com/srazzaque/7be0482c606506a8b860).
+This was a short primer to problem decomposition in FP.
+
+We looked out how one might break down a problem in OOP, and acknowledged some of the benefits that
+the resulting breakdown gives us. Our solution was a domain model that was rich, gave us
+encapsulation, readability and natural code organisation. But we limited to ourselves to the use of
+low-level controls and imperative statements to code our solution [4].
+
+We then broke down the same problem in FP. It certainly shares some similarities to OOP, but our
+focus is on data and transformations instead of objects, relationships and behaviours. The code
+naturally tended torwards the us of higher order functions (filter, reduce) rather than lower level
+control flows (if, for).
 
 Key takeaways:
 
 * Know your data
 * Know your bread and butter operations such as filter, reduce and map
 * Focus on writing pure functions
+* Namespace your functions
 
-There's, of course, much more to explore. For instance, how do we talk to databases or work with
-a messaging layer? We'll be exploring these in future posts :-)
+There is of course, much more to explore. For instance, how do we talk to databases, or work with a
+messaging layer, and how does DI fit into FP? We'll be exploring these in future posts!
+
+You can view the Clojure code for this post
+[this gist](https://gist.github.com/srazzaque/7be0482c606506a8b860).
+
+Also a big thanks goes out to [Marimuthu Madasamy](https://twitter.com/marimuthum) for reviewing!
 
 # End-notes
 
@@ -282,3 +350,8 @@ here will be encountered over and over in most FP languages.
 
 [3] The concept of "currying" or "partial application" is definitely another FP concept worth
 getting one's head around. It comes up in most languages.
+
+[4] In modern Java (8+), there is definitely space for using higher order functions that don't look
+terrible. However in 7 and prior, overly "functional" code just does not feel natural in my
+opinion. This same opinion is shared by the authors of the
+[Guava libraries](https://github.com/google/guava/wiki/FunctionalExplained).
