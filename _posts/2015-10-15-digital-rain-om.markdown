@@ -8,7 +8,7 @@ tags: clojure clojurescript cljs om react.js
 
 So I decided to write digital rain using Om/React.JS.
 
-This is an extremely quick implementation, and I found it extremely easy to write. Performance seems MUCH better than my famo.us implementation (this is not to say React.js or Om is faster than famo.us in general, but just that its much easier for me personally to write in a manner that performs well!)
+This is an extremely quick/rough implementation, and I found it extremely easy to write. Performance seems MUCH better than my famo.us implementation (this is not to say React.js or Om is faster than famo.us in general, but just that its much easier for me personally to write in a manner that performs well!)
 
 Live demo is here: [Digital Rain in Om](/digital-rain-om/index.html)
 
