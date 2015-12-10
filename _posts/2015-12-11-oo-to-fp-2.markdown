@@ -1,7 +1,7 @@
 ---
 layout: post
 title:  "OO to FP: 2 - Dependency Injection"
-date:   2015-11-09 18:21:00
+date:   2015-12-11 08:23:00
 categories: clojure
 tags: clojure java "functional programming" FP
 ---
@@ -19,8 +19,8 @@ one shall we use?". It's pretty much a given that we'll be using DI.
 Given that it's used so often, it's only natural for us Java developers to feel the need to map this
 concept to some analogous concept on FP.
 
-So in this post, I'll explore a few different ways of achieving DI in Clojure, in order of
-increasing complexity:
+In this post I explore a few different ways of achieving DI in Clojure, in order of increasing
+complexity:
 
 1. Passing a 'system value' to functions
 1. Reader monads
@@ -28,7 +28,7 @@ increasing complexity:
 
 # What does DI give us?
 
-DI actually gives us quite a bit:
+DI gives us quite a bit:
 
 1. **Enables smaller units of code**: there is almost no overhead of piecing it together. This means
    smaller and more focussed classes.
@@ -36,8 +36,8 @@ DI actually gives us quite a bit:
    at runtime.
 3. **Flexibility**: ability to switch out implementations and behaviours via config.
 
-These are all highly desirable. We'll be referring back to the above 3 items as we explore our
-solutions.
+There are more things, but I feel these are the most important. We'll be referring back to the above
+3 items as we explore our solutions.
 
 # Sample Java code
 
@@ -88,13 +88,13 @@ With some configuration, our framework will analyse the types being requested fo
 AggregateSearcher class, and inject them in at runtime.
 
 When we're writing tests, we can provide mock implementation(s) of the SocialNetworkSearch and
-database and instantiate the above class the old-fashioned way with `new`. In a staging environment,
+database and instantiate the above class the old-fashioned way with `new` [1]. In a staging environment,
 we might only be hooked up to Twitter but no others. In production, we might be hooked up to
 Twitter, Facebook and Google+.
 
 A DI container helps us achieve this flexibility by simply changing the DI configuration, rather
-than changing our code. This would result in different searcher instances and/or databases being
-`@Inject`ed into our class above, enabling access to the desired searchers, and to the database.
+than changing our code. This would result in the DI container injecting different searcher instances
+and/or database implementations into our searcher at runtime, with no code changes.
 
 # DI in Clojure I - system value
 
@@ -113,8 +113,8 @@ imagine a configuration that looks like this:
 The nice thing about having a system config value such as above is that we can store it as a simple
 `.edn` file and just read it at startup.
 
-We'd use the above config to create a "system value" at startup. To achieve this, we simply define a
-function with shape 'config -> system value':
+We'd use the above config to create a "system value" at startup. To achieve this, we define a
+function that takes the config as an input, and returns the system value:
 
 {% highlight clojure %}
 (defn create-system 
@@ -126,11 +126,11 @@ function with shape 'config -> system value':
              :response-queue (messaging/response-queue (:broker-uri config)))))
 {% endhighlight %}
 
-The resultant system value would kept and passed as an argument to any functions that needed
-it. Let's take a look at how that might look.
+The system value would then be passed as an argument to any functions that needed it. Let's take a
+look at how that might look.
 
-We define our search function as a multimethod (using `defmulti`). This multimethod will dispatch on
-the type of searcher being asked for (`:google+`, `:twitter`, etc).
+But first - let's define our search function as a multimethod (using `defmulti`). This multimethod
+will dispatch on the type of searcher being asked for (`:google+`, `:twitter`, etc).
 
 {% highlight clojure %}
 (defmulti social-search identity)
@@ -150,7 +150,7 @@ the type of searcher being asked for (`:google+`, `:twitter`, etc).
 {% endhighlight %}
 
 Finally, we define our aggregating search function, which takes the system value as a parameter, and
-pulls out the parts its interested in to do its thing:
+pulls out the parts of interest in to do its duty:
 
 {% highlight clojure %}
 (defn aggregate-social-search [system query]
@@ -174,13 +174,13 @@ requests:
 
 Revisiting our 3 points from "What does DI give us?" in light of the above code:
 
-1. **Enables smaller units of code**: Yes - we have a single function for each of our search
+1. **Enables smaller units of code**: We have a single function for each of our search
    portals. Our aggregated searcher is also defined independently - each can be updated largely
    independently.
-2. **Less "infrastructure" code**: Yes - Clojure's multimethod dispatch is our "infrastructure" code
-   for choosing different implementations of the searcher. The system value is simply a parameter,
-   therefore a dependency, of functions that need it.
-3. **Flexibility**: Yes - we're able to change how the system behaves just by changing the config.
+2. **Less "Infrastructure" code**: Clojure's multimethod dispatch is our "infrastructure" code for
+   choosing different implementations of the searcher. Dependencies are just function arguments, our
+   `create-system` function is essentially our DI container.
+3. **Flexibility**: We're able to change how the system behaves just by changing the config.
 
 # DI in Clojure II - reader monads
 
@@ -202,10 +202,6 @@ function of its knowledge of the system value. We define a function builder that
 searchers and database, returns the function that performs the search:
 
 {% highlight clojure %}
-(ns social)
-
-(defmulti social-search identity) ;; (As above in Part I)
-
 (defn aggregate-social-search
   [enabled-searchers db]
   (fn [query]
@@ -215,7 +211,7 @@ searchers and database, returns the function that performs the search:
 {% endhighlight %}
 
 We then use the reader monad to define a function that accepts an environment, reads stuff from it,
-and uses the values to construct our system:
+and uses those values to construct our system:
 
 {% highlight clojure %}
 (def create-system
@@ -244,18 +240,18 @@ right dependencies as we have done above.
 
 So let's revisit our 3 points:
 
-1. **Enables smaller units of code**: Yes - not a massive change from part I.
-2. **Less "infrastructure" code**: Yes - dependencies are expressed as function arguments as before,
-   then provided to those functions within 'create-system'.
-3. **Flexibility**: Yes - no change from part I, defining our environment differently will change
-   behaviour.
+1. **Enables smaller units of code**: Not a massive change from part I.
+2. **Less "infrastructure" code**: Minimal change from part I - function dependencies are explicit
+   rather than within a monolithic 'system' parameter.
+3. **Flexibility**: Minimal change from part I, defining our environment/config differently will
+   change the behaviour.
 
 # DI in Clojure III - Component
 
-Whilst the dependency management in Part I was contained within one function, we still need to
-maintain the order in which components are brought up manually. For instance, in the above code we
-_must_ create the database before creating the searcher (due to its dependency). We cannot just
-declare that a searcher needs a database and be done with it.
+Whilst the DI in part I and II was mainly contained within one function, we still need to maintain
+the order in which components are brought up manually. For instance, in the above code we _must_
+create the database before creating the searcher (due to its dependency). We cannot just declare
+that a searcher needs a database and be done with it.
 
 This is where Stuart Sierra's [component library](https://github.com/stuartsierra/component) can
 help us out. It gives us the ability to define components, declare their dependencies and define
@@ -265,7 +261,7 @@ up components in the correct order according to their dependencies.
 I won't go deeply into implementation since one can simply read the documentation, but rather I'll
 talk about the usage in the context of what we're doing here.
 
-Firstly - we define our aggregate searcher component:
+First we define our aggregate searcher component:
 
 {% highlight clojure %}
 (defprotocol AggregateSearch
@@ -283,10 +279,10 @@ Firstly - we define our aggregate searcher component:
 {% endhighlight %}
 
 Note we haven't implemented any 'lifecycle' protocol methods in our record above. This is because in
-the case of the aggregate search, there's nothing really to bring up. In other components however,
-like a database, there would be connections to make/close upon startup and shutdown [1].
+the case of the aggregate search, there's nothing really to bring up or down. In other components
+however, like a database, there would be connections to make/close upon startup and shutdown [2].
 
-Secondly - we define our 'system map':
+Once we've defined all our components, we define our 'system map':
 
 {% highlight clojure %}
 (defn create-system [config]
@@ -303,30 +299,37 @@ aggregate searcher component at runtime so that it's available to the `search` f
 
 Quickly revisiting our 3 points:
 
-1. **Enables smaller units of code**: Yes - there is a little more ceremony involved in working with
-   component when comparing to our other 2 solutions.
-2. **Less “infrastructure” code**: Yes - dependencies are stated declaratively, and Component takes
-   care of the lifecycle for us (provided we implement the lifecycle protocol appropriately).
-3. **Flexibility**: Yes - no change from part I or II. Defining our environment/config differently
+1. **Enables smaller units of code**: We still have this, though there is a little more ceremony
+   involved in working with component when comparing to our other 2 solutions.
+2. **Less “infrastructure” code**: Dependencies are now stated declaratively, and Component takes
+   care of the lifecycle for us (provided we implement the lifecycle protocol appropriately in our
+   components).
+3. **Flexibility**: Minimal change from part I or II. Defining our environment/config differently
    will change behaviour with no required code changes.
 
 # Conclusions
 
 In this post, we explored 3 ways to achieve DI in Clojure.
 
-Firstly, we stayed within the bounds of the Clojure standard language. We used function parameters to express
-a function's dependencies, and explored the use of a system value.
+Firstly, we stayed within the bounds of the Clojure language features. We supplied a system value to
+functions as an argument - so that functions could make use of any parts of the system it was
+interested in. We defined a `create-system` function to stitch together the system at runtime.
 
-Secondly, we used reader monads to define a function that accepted an environment as an input,
-sucked things out of the environment and provided functions with a more focussed set
+Secondly, we optimised this further by having functions that depend only on the parts of a system
+they are interested in, and used reader monads to help us here. This allowed us to refine
+`create-system` to accept the config/environment and then call functions appropriately to bring up
+our system [3].
 
-Finally, we used the Component library to implement a more heavy-weight solution that gave us some
-neat ways of being declarative with our dependencies, and gives us fine-grained control over the
-lifecycle for each component that makes up our system.
+Finally, we used the Component library to implement a (slightly) more heavy-weight solution that
+gave us a neat way of being declarative with our dependencies. It also gives us fine-grained control
+over the lifecycle for each component that makes up our system, and takes care of bring things up in
+the right order.
 
 
 # End notes
 
-1. There's definitely a level of understanding required for implementing the component/Lifecycle
+1. We could also use Mockito's `@InjectMocks` annotation.
+2. There's definitely a level of understanding required for implementing the component/Lifecycle
    protocol - beyond what's in this post. I'd strongly recommend referring to the github page.
-
+3. There's nothing to say we couldn't have achieved this without reader monads quite easily, but I
+   thought I'd scratch the surface of what monadic workflows can do for us.
