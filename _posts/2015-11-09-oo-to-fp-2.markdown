@@ -1,0 +1,332 @@
+---
+layout: post
+title:  "OO to FP: 2 - Dependency Injection"
+date:   2015-11-09 18:21:00
+categories: clojure
+tags: clojure java "functional programming" FP
+---
+
+This is the second in a series of posts in which I'll be examining common patterns found in OO, the
+problems they are trying to solve, and then how these same problems might be approached in
+Clojure. The first part can be found [here]({% post_url 2015-09-01-oo-to-fp-1 %}).
+
+Today I'm going to approach the topic of Dependency Injection (DI).
+
+In most sufficiently large systems that I've encountered in Java, the decision of whether or not use
+a DI framework isn't something we think about. Instead we head straight to the question of "which
+one shall we use?". It's pretty much a given that we'll be using DI.
+
+Given that it's used so often, it's only natural for us Java developers to feel the need to map this
+concept to some analogous concept on FP.
+
+So in this post, I'll explore a few different ways of achieving DI in Clojure, in order of
+increasing complexity:
+
+1. Passing a 'system value' to functions
+1. Reader monads
+1. Component library
+
+# What does DI give us?
+
+DI actually gives us quite a bit:
+
+1. **Enables smaller units of code**: there is almost no overhead of piecing it together. This means
+   smaller and more focussed classes.
+2. **Less "infrastructure" code**: the DI framework will take care of stitching our system together
+   at runtime.
+3. **Flexibility**: ability to switch out implementations and behaviours via config.
+
+These are all highly desirable. We'll be referring back to the above 3 items as we explore our
+solutions.
+
+# Sample Java code
+
+Let us set the scene in Java. Today we'll 'pretend write' some code that takes a string and searches
+the major social networks using that string as a query.
+
+Let's define the interface:
+
+{% highlight java %}
+public interface SocialNetworkSearch {
+  List<Item> search(String query);
+}
+{% endhighlight %}
+
+In our application - we will have multiple implementations of the above wired up at
+runtime. Furthermore, let's pretend we wish to log all search queries into a database. Take a look
+below:
+
+{% highlight java %}
+public class AggregateSearch {
+
+  private final List<SocialNetworkSearch> searchers;
+  private final Database database;
+
+  @Inject
+  AggregateSearch(List<SocialNetworkSearch> searchers, Database database) {
+    this.searchers = ImmutableList.copyOf(searchers);
+    this.database = database;
+  }
+
+  /**
+   * Returns an aggregate list of search results from each social network
+   */
+  public List<Item> getResults(String query) {
+    database.logQuery(query);
+    List<Item> allItems = Lists.newArrayList();
+    for (SocialNetworkSearch search : searchers) {
+      allItems.addAll(searchers.search(query));
+    }
+    return allItems;
+  }
+}
+{% endhighlight %}
+
+(We are avoiding all threading/concurrency discussions for now. A topic for another day.)
+
+With some configuration, our framework will analyse the types being requested for injection by our
+AggregateSearcher class, and inject them in at runtime.
+
+When we're writing tests, we can provide mock implementation(s) of the SocialNetworkSearch and
+database and instantiate the above class the old-fashioned way with `new`. In a staging environment,
+we might only be hooked up to Twitter but no others. In production, we might be hooked up to
+Twitter, Facebook and Google+.
+
+A DI container helps us achieve this flexibility by simply changing the DI configuration, rather
+than changing our code. This would result in different searcher instances and/or databases being
+`@Inject`ed into our class above, enabling access to the desired searchers, and to the database.
+
+# DI in Clojure I - system value
+
+So let's explore one simple way to achieve this in Clojure.
+
+In this first approach, we're going to dispatch functions based on a configuration value. To
+dispatch on a system value, we'll need a value that represents our 'system'. For the above, we could
+imagine a configuration that looks like this:
+
+{% highlight clojure %}
+(def config {:enabled-searchers [:twitter :facebook :google+]
+             :db-uri "jdbc:......"
+             :broker-uri "some://message-broker"})
+{% endhighlight %}
+
+The nice thing about having a system config value such as above is that we can store it as a simple
+`.edn` file and just read it at startup.
+
+We'd use the above config to create a "system value" at startup. To achieve this, we simply define a
+function with shape 'config -> system value':
+
+{% highlight clojure %}
+(defn create-system 
+  "Connects to db and messaging layer, and returns configured system."
+  [config]
+  (-> config
+      (assoc :db-conn (connect-to-db (:db-uri config))
+             :request-queue (messaging/request-queue (:broker-uri config))
+             :response-queue (messaging/response-queue (:broker-uri config)))))
+{% endhighlight %}
+
+The resultant system value would kept and passed as an argument to any functions that needed
+it. Let's take a look at how that might look.
+
+We define our search function as a multimethod (using `defmulti`). This multimethod will dispatch on
+the type of searcher being asked for (`:google+`, `:twitter`, etc).
+
+{% highlight clojure %}
+(defmulti social-search identity)
+
+(defmethod social-search :twitter [network query]
+  (println "Searching twitter for " query)
+  ...)
+
+(defmethod social-search :facebook [network query]
+  (println "Searching Facebook for " query)
+  ...)
+
+(defmethod social-search :test [network query]
+  (println "[TEST] Searching for " query)
+  [{:content "Hey there!"
+   :user "Sandipan"}])
+{% endhighlight %}
+
+Finally, we define our aggregating search function, which takes the system value as a parameter, and
+pulls out the parts its interested in to do its thing:
+
+{% highlight clojure %}
+(defn aggregate-social-search [system query]
+  (log-to-database! (:db-conn system) query) 
+  (for [portal (:enabled-searchers system)]
+    (social-search portal query)))
+{% endhighlight %}
+
+We could imagine utilising the above function in an area of the code that serves the search
+requests:
+
+{% highlight clojure %}
+(defn serve-requests
+  "Listens on the request-queue for queries and serves them."
+  [system]
+  (for [query (:request-queue system)]
+    (let [result (aggregate-social-search system query)]
+      (messaging/send! (:response-queue system) result))))
+{% endhighlight %}
+
+
+Revisiting our 3 points from "What does DI give us?" in light of the above code:
+
+1. **Enables smaller units of code**: Yes - we have a single function for each of our search
+   portals. Our aggregated searcher is also defined independently - each can be updated largely
+   independently.
+2. **Less "infrastructure" code**: Yes - Clojure's multimethod dispatch is our "infrastructure" code
+   for choosing different implementations of the searcher. The system value is simply a parameter,
+   therefore a dependency, of functions that need it.
+3. **Flexibility**: Yes - we're able to change how the system behaves just by changing the config.
+
+# DI in Clojure II - reader monads
+
+Part I gave us a solution which might work well for smaller systems. But it did pose a slight
+problem. Every function that had a dependency needed to accept the *whole* system value as an
+argument, rather than just the parts of the system that concerned it. This leads to a lot of areas
+of the code needing to be 'system value aware', including our tests.
+
+Reader monads give us a potential solution for this. They enable us to define a function that, given
+an "environment" value, will read something from that environment, and do something with that
+value.
+
+I'm not going to write deeply about monads in this post. Rather I'll focus on how you can use reader
+monads specifically to solve this problem. The monad implementation we'll be using is
+[algo.monads](https://github.com/clojure/algo.monads).
+
+Continuing with our social searching example - we shall now strip the `aggregate-social-search`
+function of its knowledge of the system value. We define a function builder that, given the enabled
+searchers and database, returns the function that performs the search:
+
+{% highlight clojure %}
+(ns social)
+
+(defmulti social-search identity) ;; (As above in Part I)
+
+(defn aggregate-social-search
+  [enabled-searchers db]
+  (fn [query]
+    (log-to-database! db query) 
+    (for [portal enabled-searchers]
+      (social-search portal query))))
+{% endhighlight %}
+
+We then use the reader monad to define a function that accepts an environment, reads stuff from it,
+and uses the values to construct our system:
+
+{% highlight clojure %}
+(def create-system
+  (domonad reader-m
+           [db-uri (asks :db-uri)
+            enabled-searchers (asks :enabled-searchers)
+            db (m-result (create-db db-uri))]]
+           {:db db
+            :searcher (create-searcher enabled-searchers db)})
+{% endhighlight %}
+
+It's important to understand that the `create-system` var above will end up as a _function that
+accepts an environment as an input_. When called, it will thread this environment into each of the
+readers defined with `asks`, and finally return what's in the body of the computation. So we can use
+it like this:
+
+{% highlight clojure %}
+(let [system (create-system {:db-uri "jdbc:foo:bar"
+                             :enabled-searchers [:twitter :facebook]})]
+  ...)
+{% endhighlight %}
+
+Obviously this system is largely contrived, and in a real system we'd have multiple interdependent
+components in our system. We could use reader monads to instantiate those components with the
+right dependencies as we have done above.
+
+So let's revisit our 3 points:
+
+1. **Enables smaller units of code**: Yes - not a massive change from part I.
+2. **Less "infrastructure" code**: Yes - dependencies are expressed as function arguments as before,
+   then provided to those functions within 'create-system'.
+3. **Flexibility**: Yes - no change from part I, defining our environment differently will change
+   behaviour.
+
+# DI in Clojure III - Component
+
+Whilst the dependency management in Part I was contained within one function, we still need to
+maintain the order in which components are brought up manually. For instance, in the above code we
+_must_ create the database before creating the searcher (due to its dependency). We cannot just
+declare that a searcher needs a database and be done with it.
+
+This is where Stuart Sierra's [component library](https://github.com/stuartsierra/component) can
+help us out. It gives us the ability to define components, declare their dependencies and define
+their lifecycles. The Component library then stitches things together for us at runtime - bringing
+up components in the correct order according to their dependencies.
+
+I won't go deeply into implementation since one can simply read the documentation, but rather I'll
+talk about the usage in the context of what we're doing here.
+
+Firstly - we define our aggregate searcher component:
+
+{% highlight clojure %}
+(defprotocol AggregateSearch
+  (search [this query]))
+
+(defrecord AggregateSearchComponent [db-conn enabled-searchers]
+  AggregateSearch
+  (search [this query]
+    (log-to-database! db-conn query) 
+    (for [portal enabled-searchers]
+      (social-search portal query))))
+
+(defn aggregate-search-component [enabled-searchers]
+  (AggregateSearchComponent. nil enabled-searchers))
+{% endhighlight %}
+
+Note we haven't implemented any 'lifecycle' protocol methods in our record above. This is because in
+the case of the aggregate search, there's nothing really to bring up. In other components however,
+like a database, there would be connections to make/close upon startup and shutdown [1].
+
+Secondly - we define our 'system map':
+
+{% highlight clojure %}
+(defn create-system [config]
+  (component/system-map
+    {:searcher (component/using
+                  (aggregate-search-component (:enabled-searchers config))
+                  [:db-conn]) ;; <-- these are the dependencies
+     :db-conn (db-component (:db-uri config))}))
+{% endhighlight %}
+
+The key take-away from this is that declaring our aggregate searcher's dependency on 'db-conn' above
+is _declarative_, and Component takes care of injecting (really just assoc'ing) the db-conn into our
+aggregate searcher component at runtime so that it's available to the `search` function.
+
+Quickly revisiting our 3 points:
+
+1. **Enables smaller units of code**: Yes - there is a little more ceremony involved in working with
+   component when comparing to our other 2 solutions.
+2. **Less “infrastructure” code**: Yes - dependencies are stated declaratively, and Component takes
+   care of the lifecycle for us (provided we implement the lifecycle protocol appropriately).
+3. **Flexibility**: Yes - no change from part I or II. Defining our environment/config differently
+   will change behaviour with no required code changes.
+
+# Conclusions
+
+In this post, we explored 3 ways to achieve DI in Clojure.
+
+Firstly, we stayed within the bounds of the Clojure standard language. We used function parameters to express
+a function's dependencies, and explored the use of a system value.
+
+Secondly, we used reader monads to define a function that accepted an environment as an input,
+sucked things out of the environment and provided functions with a more focussed set
+
+Finally, we used the Component library to implement a more heavy-weight solution that gave us some
+neat ways of being declarative with our dependencies, and gives us fine-grained control over the
+lifecycle for each component that makes up our system.
+
+
+# End notes
+
+1. There's definitely a level of understanding required for implementing the component/Lifecycle
+   protocol - beyond what's in this post. I'd strongly recommend referring to the github page.
+
