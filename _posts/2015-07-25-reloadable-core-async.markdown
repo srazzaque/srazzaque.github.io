@@ -89,10 +89,9 @@ Prefer:
 {% highlight clojure %}
 (go
   (loop []
-    (let [msg (<! incoming-msgs)]
-      (when msg
-        (process-fn msg)
-        (recur))))
+    (when-let [msg (<! incoming-msgs)]
+      (process-fn msg)
+      (recur)))
   (println "I've finished!"))
 {% endhighlight %}
 

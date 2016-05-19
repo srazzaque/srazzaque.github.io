@@ -322,8 +322,8 @@ our system [3].
 
 Finally, we used the Component library to implement a (slightly) more heavy-weight solution that
 gave us a neat way of being declarative with our dependencies. It also gives us fine-grained control
-over the lifecycle for each component that makes up our system, and takes care of bring things up in
-the right order.
+over the lifecycle for each component that makes up our system, and takes care of bringing things up
+in the right order.
 
 
 # End notes
