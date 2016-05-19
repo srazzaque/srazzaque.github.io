@@ -78,25 +78,25 @@ Parking take's (<!) will receive 'nil' from closed channels. The go-block should
 Rather than:
 
 {% highlight clojure %}
-(go
-  (loop []
-    (process-fn (<! incoming-msgs))
-    (recur)))
+(go-loop []
+  (process-fn (<! incoming-msgs))
+  (recur))
 {% endhighlight %}
 
 Prefer:
 
 {% highlight clojure %}
-(go
-  (loop []
-    (when-let [msg (<! incoming-msgs)]
-      (process-fn msg)
-      (recur)))
-  (println "I've finished!"))
+(go-loop []
+  (if-let [msg (<! incoming-msgs)]
+    (do
+      (println "Received " msg)
+      (recur))
+    (println "Done.")))
 {% endhighlight %}
 
 A little more verbose, but the go-blocks listening to those channels will complete gracefully on the
-channel closing.
+channel closing. This is especially important in repl development, as you can leave a lot of these
+go-loops kicking around taking up resources.
 
 # Stop channels
 
