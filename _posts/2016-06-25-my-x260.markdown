@@ -1,0 +1,50 @@
+---
+layout: post
+title:  "Lenovo Thinkpad x260 - thoughts after the first week"
+date:   2016-06-25 00:00:01
+categories: hardware thinkpad laptops
+tags: thinkpad
+---
+
+A few weeks ago I bought an x260, and it just arrived this week. My x220 was actually still running
+strong, but it was time to upgrade. I thought I'd put together some thoughts for anyone else
+considering buying the x260.
+
+Overall thoughts: I'm very happy with the purchase. There are some minor things that are slightly
+annoying, but the good definitely outweighs the bad.
+
+Likes:
+
+* The screen - 1920x1080 is plenty good for me and what I do (predominantly programming and looking
+  at plain text files). Though there are several laptops on the market now with better resolutions,
+  namely the Dell XPS 13" and the Razer Blade Stealth.
+* Battery life is mindblowing.
+* Ubuntu Linux (16.04) works perfectly on it. No issues so far aside from some weirdness when
+  docking and undocking whilst the computer is asleep.
+* The touchpad is great. I still prefer the trackpoint whilst doing 'keyboard-intensive' tasks, but
+  I find I'm actually using the touchpad quite a bit, now that it's no longer terrible.
+* Simple, minimalist aesthetics. It's really nothing that fancy to look at. Some might consider this
+  a "dislike", but personally I like it.
+* Display device ports of the modern age - HDMI and DP.
+* No MS/Windows stickers on the machine (though there's an intel one.)
+* Build quality - solid, I expect nothing less from a ThinkPad.
+* Externally accessible sim port - x220 had this hidden behind the battery which was annoying.
+
+Things I miss (from the x220, t61p and older) and/or dislike:
+
+* Whilst the keyboard is good, and has much better tactile feel versus other keyboards on the
+  market, it's just not as good as the older ThinkPads. Perhaps it's just a case of familiarity. But
+  there's a few things I'm not a big fan of here:
+    * The 'insert' key is a meta-key. I copy and paste using ctrl+insert and shift+insert. This is a
+      little awkward on this keyboard.
+    * Dedicated hardware buttons for volume up/down and muting the mic are no longer available.
+    * Page up/down are now near the up/down/left/right arrow
+    * No more numpad! Prior models allowed you to hold down fn and have the right portion of the
+      keyboard operate as a numpad.
+    * No more dedicated function button to enable/disable touchpad. Note: I've worked around this
+      using the ubuntu 'touchpad-indicator' application and using my own shortcut.
+    * Hidden fn-keys that were a little hard to discover - e.g. fn+s for print-screen.
+* LED indicators for bluetooth, wifi, sleep.
+    * The trade-off is the simplicity of the design as mentioned above. But really there's plenty of
+      blank space on that bezel.
+* Hardware kill-switch for wireless communication. This is quite useful when travelling.
