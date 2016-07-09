@@ -57,7 +57,7 @@ following alternative:
   (thread
     (loop [state {}]
       (if-let [msg (<!! incoming)]
-        (let [[next-state outgoing-msgs] (process-message! state msg)]
+        (let [[next-state outgoing-msgs] (process-message state msg)]
           (>!! outgoing outgoing-msgs)
           (recur next-state))))))
 {% endhighlight %}
