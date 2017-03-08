@@ -6,6 +6,10 @@ categories: clojure
 tags: clojure java "functional programming" FP state
 ---
 
+Updated: 2017/03/08 - Using an (atom) with a single thread is basically as fast as a loop with no
+ref. This also gives us the benefit if having something deref'able outside the loop. (See update
+towards the bottom of the post).
+
 In some research I've been doing, I've found that using a simple single threaded loop for business
 logic with a recur statement is blisteringly fast compared to the overhead of using a ref and
 dosync. Furthermore, it can simplify code.
@@ -121,6 +125,14 @@ least - until I feel its absolutely needed, I'll probably be sticking with a sim
 So the next time you're working the internal structure of your application - I'd urge you to ask
 yourself - do you _really_ need that ref?
 
+UPDATE: 2017/03/08
 
+More recently, in the course of working on another piece of work, I noticed that there wasn't a huge
+difference between using an atom with a single thread and a loop without a ref. So I decided to
+revisit this code and add tests for using the refs with a single thread. Results below:
 
+![Chart showing time to process 1 million events](/assets/loop_ref_dosync_redo.png)
 
+In this later piece of work, I've actually preferred the single-thread-with-atom approach. There
+isn't a huge performance difference as can be seen in the above test, plus gives us the benefits of
+being able to deref externally.
