@@ -1,6 +1,6 @@
 ---
 layout: post
-title:  "Complexity spikes at the edges"
+title:  "Complexity spikes at the edges of software design"
 date:   2017-10-24 00:00:01
 categories: software-development
 tags: software-development
