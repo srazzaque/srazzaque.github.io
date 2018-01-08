@@ -1,7 +1,7 @@
 ---
 layout: post
-title:  "Git one-liners"
-date:   2017-09-20 00:00:01
+title:  "Git one-liner: which folder has had the most activity over the last 30 days?"
+date:   2018-01-08 00:00:01
 categories: software-development
 tags: software-development git
 ---
