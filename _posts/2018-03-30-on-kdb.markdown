@@ -1,0 +1,74 @@
+---
+layout: post
+title:  "Playing with KDB+ and Q"
+date:   2018-03-30 
+categories: software-development
+tags: software-development kdb q languages
+---
+
+On my latest project at work, I've had the opportunity to work a little with KDB+ and the Q
+language. Now the tersity of Q has been written about a thousand times - that it's extremely
+efficient (line-weight wise) at doing what it's meant for. Take the following example:
+
+{% highlight q %}
+numtrades: 1000000
+trades:([]
+  tradetime: numtrades?2000.01.01D00:00:00.000;
+  symbol: numtrades?`AUDUSD`AUDJPY`USDGBP;
+  px: numtrades?0.73443;
+  vol: numtrades?10000000)
+show "Trades generated."
+{% endhighlight %}
+
+The above Q code generates a table of 1 million rows with some faux trade data. Now of course, this
+would fast get picked up in code review and corrected - the traditional "job-secure" way to write it
+would be like this:
+
+{% highlight q %}
+n:1000000
+t:([]ts:n?2000.01.01D00:00:00.000;s:n?`AUDUSD`AUDJPY`USDGBP;px:n?0.73443;v:n?10000000)
+-1!"Trades generated."
+{% endhighlight %}
+
+In fact there's probably a shorter way. But in professional outfits you won't see too much code
+written this way, with the exception of prototype code.
+
+But honestly - manipulating huge in-memory data structures in microseconds is cool and all, but what
+struck me is how Q's tersity is leveraged for other, traditionally "hard" parts of large-scale
+software development. Namely, the tersity through which you can persist data to disk, and
+communicate between processes using the IPC mechanisms. Check it out:
+
+{% highlight q %}
+/ In process 1
+syms:`AUDUSD`EURUSD`GBPUSD`USDJPY
+prices:([] timestamp: "n"$(); symbol: "s"$(); px: "f"$())
+saveTable:{[] `:/tmp/prices.dat set prices; delete from `prices}
+.z.ts:{[] saveTable[]}
+\t 30000
+\p 1213
+
+/ In process 2
+h:hopen `::1213
+.z.ts:{[] (neg h) "`prices insert .z.N,(1?syms),(1?2.0)"}
+\t 500
+{% endhighlight %}
+
+I've done this all as one-liners so that anyone following along can paste into a Q console.
+
+In process 1, I defined an in-memory table named 'prices' to capture pricing data, and set it to
+listen on port 1213. Then, in process 2, I defined a function to generate one point of data that
+will be executed in process 1 every 500 ms. Every 30 seconds in process 1, the table is saved to
+disk.
+
+Note there are a LOT of points that do not make this production-ready, but serves to illustrate how
+dense and terse Q can really be. Process 2 shouldn't *really* know about the internal structure of
+the prices table, in case it changes. Also we shouldn't nuke our pricing data every 30 seconds. Also
+we should use partitioning. Also, we should use a
+[ticker plant](https://code.kx.com/wiki/Startingkdbplus/tick#6.3_Tickerplant). And there's probably
+a lot more that I don't know yet.
+
+Anyway, I'll definitely be playing with it some more over the coming months. Always fun learning a
+language and paradigm that is a fundamentally different way of problem-solving.
+
+(And if you're curious about what all that cryptic line noise above is - you should check out Q4M on
+[code.kx.com](http://code.kx.com)).
