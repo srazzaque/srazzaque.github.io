@@ -23,7 +23,9 @@ this is far more lightweight, realtime and flexible if you already happen to hav
 Perhaps more common would be:
 
 {% highlight bash %}
-[srazzaque@srv ~]$ long-running-cmd && echo "done" > ~/Dropbox/command-done.txt
+[srazzaque@srv ~]$ long-running-cmd > ~/Dropbox/cmd-output.txt
 {% endhighlight %}
 
-And that's basically it - you can view the files on any device that supports Dropbox.
+And that's basically it - you can view the files on any device that supports Dropbox. You could use
+it for basically any command that has text output (which is, basically most Linux commands you'd run
+in a terminal) - so monitoring processes, uptime, anything.
