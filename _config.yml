@@ -1,12 +1,10 @@
 # Site settings
 title: "#!/bin/sandipan"
-email: me@sandipan.net
 description: > # this means to ignore newlines until "baseurl:"
   Programming & productivity.
 baseurl: "" # the subpath of your site, e.g. /blog/
-url: "http://blog.sandipan.net" # the base hostname & protocol for your site
-twitter_username: srazzaque
-github_username:  srazzaque
+url: "https://blog.sandipan.net" # the base hostname & protocol for your site
 
 # Build settings
 markdown: kramdown
+repository: srazzaque/srazzaque.github.io
